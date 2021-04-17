@@ -7,12 +7,12 @@ use futures::{
     future::try_join_all,
 };
 
-pub fn get_definition(vocablist: Vec<String>, v: u8) -> Result<Vec<Word>, Box<dyn Error>> {
+pub fn get_definition(wordlist: &mut Vec<Word>, v: u8) -> Result<(), Box<dyn Error>> {
 
     let mut urilist: Vec<String> = Vec::new();
-    let mut wordlist: Vec<Word> = Vec::new();
 
-    for vocab in vocablist {
+    for word in wordlist.into_iter() {
+        let vocab = &word.word;
         debug_print(format!("Received Vocab: {}", vocab), 2, v);
         let uri = format!("https://dictionaryapi.com/api/v3/references/collegiate/json/{}?key=04a5d981-0869-42c8-a87c-c8cbfdcfcb56", vocab);
         urilist.push(uri);
@@ -26,22 +26,17 @@ pub fn get_definition(vocablist: Vec<String>, v: u8) -> Result<Vec<Word>, Box<dy
         }
     };
 
-    for json in jsonlist.iter() {
+    for (i, json) in jsonlist.iter().enumerate() {
         debug_print(format!("Received json:\n{}", json), 3, v);
 
-        let word = Word {
-                        //word: vocablist[i].to_string(),
-                    headword: json[0]["hwi"]["hw"].to_string(),
-              pronunciations: json[0]["hwi"]["prs"][0]["mw"].to_string(),
-            example_sentence: "".to_string(),
-                  definition: json[0]["shortdef"].to_string(),
-        };
+        wordlist[i].headword = json[0]["hwi"]["hw"].to_string();
+        wordlist[i].pronunciations = json[0]["hwi"]["prs"][0]["mw"].to_string();
+        wordlist[i].definition = json[0]["shortdef"].to_string();
         
-        debug_print(format!("{}", word), 1, v);
-        wordlist.push(word);
+        debug_print(format!("{}", wordlist[i]), 1, v);
     }
 
-    Ok(wordlist)
+    Ok(())
         
 }
 
