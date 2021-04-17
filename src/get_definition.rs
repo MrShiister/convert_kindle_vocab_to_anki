@@ -4,13 +4,13 @@ use surf;
 use serde_json::Value;
 use futures::{
     executor::block_on,
-    stream::FuturesOrdered,
+    future::try_join_all,
 };
 
 pub fn get_definition(vocablist: Vec<String>, v: u8) -> Result<Vec<Word>, Box<dyn Error>> {
 
-    let urilist: Vec<String> = Vec::new();
-    let wordlist: Vec<Word> = Vec::new();
+    let mut urilist: Vec<String> = Vec::new();
+    let mut wordlist: Vec<Word> = Vec::new();
 
     for vocab in vocablist {
         debug_print(format!("Received Vocab: {}", vocab), 2, v);
@@ -26,11 +26,11 @@ pub fn get_definition(vocablist: Vec<String>, v: u8) -> Result<Vec<Word>, Box<dy
         }
     };
 
-    for (i, json) in jsonlist.iter().enumerate() {
+    for json in jsonlist.iter() {
         debug_print(format!("Received json:\n{}", json), 3, v);
 
         let word = Word {
-                        word: vocablist[i].to_string(),
+                        //word: vocablist[i].to_string(),
                     headword: json[0]["hwi"]["hw"].to_string(),
               pronunciations: json[0]["hwi"]["prs"][0]["mw"].to_string(),
             example_sentence: "".to_string(),
@@ -47,23 +47,14 @@ pub fn get_definition(vocablist: Vec<String>, v: u8) -> Result<Vec<Word>, Box<dy
 
 pub async fn get_json(urilist: Vec<String>) -> Result<Vec<Value>, Box<dyn Error>> {
 
-    let reslist: Vec<Value> = Vec::new();
-    let futlist = FuturesOrdered::new();
+    let mut futlist = Vec::new();
 
     for uri in urilist {
         let fut = surf::get(uri).recv_json();
         futlist.push(fut);
     }
     
-    futlist.collect::<Vec<_>>(); // TODO: How to poll/collect?
-
-//    let res = match surf::get(uri).recv_json().await {
-//        Ok(s) => s,
-//        Err(e) => {
-//            eprintln!("{}", e);
-//            // return Err("get failed".into())
-//        }
-//    };
+    let reslist = try_join_all(futlist).await?;
 
     Ok(reslist)
 }

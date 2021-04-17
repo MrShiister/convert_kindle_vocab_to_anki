@@ -7,7 +7,7 @@ use std::{
 };
 
 pub struct Word {
-                word: String, // original word
+                // word: String, // original word
             headword: String, // 2.3 hw
       pronunciations: String, // 2.6 prs
     example_sentence: String, // imported
@@ -16,7 +16,8 @@ pub struct Word {
 
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Word: {}\nHeadword: {}\nPronunciation: {}\nExample Sentence: {}\nDefinition: {}", self.word, self.headword, self.pronunciations, self.example_sentence, self.definition)
+        // writeln!(f, "Word: {}\nHeadword: {}\nPronunciation: {}\nExample Sentence: {}\nDefinition: {}", self.word, self.headword, self.pronunciations, self.example_sentence, self.definition)
+        writeln!(f, "Headword: {}\nPronunciation: {}\nExample Sentence: {}\nDefinition: {}", self.headword, self.pronunciations, self.example_sentence, self.definition)
     }
 }
 
@@ -39,10 +40,12 @@ pub fn run(matches: ArgMatches) {
     // Check if we are only doing test.
     if let Some(matches) = matches.subcommand_matches("test") {
 
-        let vocablist: Vec<String> = Vec::new();
+        let mut vocablist: Vec<String> = Vec::new();
 
-        let vocab = matches.value_of("vocab").unwrap();
-        vocablist.push(vocab.to_string());
+        let vocabargs = matches.values_of("vocab").unwrap();
+        for vocab in vocabargs {
+            vocablist.push(vocab.to_string());
+        }
 
         // Minimum 1 verbosity for test
         if v == 0 { v = 1 };

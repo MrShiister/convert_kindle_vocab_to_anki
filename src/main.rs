@@ -44,6 +44,7 @@ fn main() {
                                           .default_value("beautiful")
                                           //.required(true)
                                           .takes_value(true)
+                                          .min_values(1)
                                           .help("Vocab to test")
                                           .index(1)))
                           .get_matches();
