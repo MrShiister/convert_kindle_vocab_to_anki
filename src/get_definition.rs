@@ -7,33 +7,68 @@ use futures::{
     future::try_join_all,
 };
 
+static CHUNK_SIZE: usize = 100;
+
 pub fn get_definition(wordlist: &mut Vec<Word>, v: u8) -> Result<(), Box<dyn Error>> {
 
-    let mut urilist: Vec<String> = Vec::new();
+    let mut jsonlist = Vec::new();
+    let mut chunk_cnt = 0;
 
-    for word in wordlist.into_iter() {
-        let vocab = &word.word;
-        debug_print(format!("Received Vocab: {}", vocab), 2, v);
-        let uri = format!("https://dictionaryapi.com/api/v3/references/collegiate/json/{}?key=04a5d981-0869-42c8-a87c-c8cbfdcfcb56", vocab);
-        urilist.push(uri);
+    // Sending too many requests seem to cause dropped connections. Send it batches of CHUNK_SIZE.
+    for chunk in wordlist.chunks_mut(CHUNK_SIZE) {
+        let mut urilist: Vec<String> = Vec::new();
+        for (i, word) in chunk.iter_mut().enumerate() {
+            let vocab = &word.word;
+            debug_print(format!("Received {} Vocab: {}", chunk_cnt*CHUNK_SIZE+i+1, vocab), 1, v);
+            let uri = format!("https://dictionaryapi.com/api/v3/references/collegiate/json/{}?key=04a5d981-0869-42c8-a87c-c8cbfdcfcb56", vocab);
+            urilist.push(uri);
+        }
+        chunk_cnt += 1;
+
+        let mut jsonlist_running = match block_on(get_json(urilist)) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("{}", e);
+                return Err("Invalid response".into())
+            }
+        };
+
+        jsonlist.append(&mut jsonlist_running);
     }
 
-    let jsonlist = match block_on(get_json(urilist)) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("{}", e);
-            return Err("Invalid response".into())
-        }
-    };
 
     for (i, json) in jsonlist.iter().enumerate() {
-        debug_print(format!("Received json:\n{}", json), 3, v);
-
         wordlist[i].headword = json[0]["hwi"]["hw"].to_string();
         wordlist[i].pronunciations = json[0]["hwi"]["prs"][0]["mw"].to_string();
         wordlist[i].definition = json[0]["shortdef"].to_string();
         
-        debug_print(format!("{}", wordlist[i]), 1, v);
+        debug_print(format!("Received {} json: {}", i+1, wordlist[i].headword), 1, v);
+        debug_print(format!("{}", wordlist[i]), 2, v);
+        debug_print(format!("{}", json), 3, v);
+        
+        if wordlist[i].headword == "null" {
+            let vocab = &json[0];
+            debug_print(format!("{} is null. Trying {} instead.", wordlist[i].word, vocab), 0, v);
+            let uri = format!("https://dictionaryapi.com/api/v3/references/collegiate/json/{}?key=04a5d981-0869-42c8-a87c-c8cbfdcfcb56", vocab);
+            let urilist = vec![uri];
+            let reslist = match block_on(get_json(urilist)) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return Err("Invalid response".into())
+                }
+            };
+
+            for json in reslist {
+                wordlist[i].headword = json[0]["hwi"]["hw"].to_string();
+                wordlist[i].pronunciations = json[0]["hwi"]["prs"][0]["mw"].to_string();
+                wordlist[i].definition = json[0]["shortdef"].to_string();
+            
+                debug_print(format!("Received {} json: {}", i+1, wordlist[i].headword), 1, v);
+                debug_print(format!("{}", wordlist[i]), 2, v);
+                debug_print(format!("{}", json), 3, v);
+            }
+        }
     }
 
     Ok(())

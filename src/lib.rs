@@ -1,5 +1,7 @@
 mod get_definition;
+mod get_lookups;
 pub use crate::get_definition::get_definition;
+pub use crate::get_lookups::get_lookups;
 use clap::ArgMatches;
 use std::{
     fmt,
@@ -7,6 +9,7 @@ use std::{
 };
 
 pub struct Word {
+            word_key: String, // word key as recorded by Kindle
                 word: String, // original word
             headword: String, // 2.3 hw
       pronunciations: String, // 2.6 prs
@@ -16,7 +19,7 @@ pub struct Word {
 
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Word: {}\nHeadword: {}\nPronunciation: {}\nExample Sentence: {}\nDefinition: {}", self.word, self.headword, self.pronunciations, self.example_sentence, self.definition)
+        writeln!(f, "Word Key: {}\nWord: {}\nHeadword: {}\nPronunciation: {}\nExample Sentence: {}\nDefinition: {}", self.word_key, self.word, self.headword, self.pronunciations, self.example_sentence, self.definition)
     }
 }
 
@@ -36,14 +39,15 @@ pub fn run(matches: ArgMatches) {
         3 | _ => 3,
     };
 
+    let mut wordlist: Vec<Word> = Vec::new();
+
     // Check if we are only doing test.
     if let Some(matches) = matches.subcommand_matches("test") {
 
-        let mut wordlist: Vec<Word> = Vec::new();
-
-        let vocabargs = matches.values_of("vocab").unwrap();
-        for vocab in vocabargs {
+        let words = matches.values_of("words").unwrap();
+        for vocab in words {
             let word = Word {
+                        word_key: "".to_string(), // original word
                             word: vocab.to_string(), // original word
                         headword: "".to_string(), // 2.3 hw
                   pronunciations: "".to_string(), // 2.6 prs
@@ -65,10 +69,29 @@ pub fn run(matches: ArgMatches) {
     } else {
     // We are doing the real thing.
         debug_print(format!("Writing results to: {}", matches.value_of("OUTFILE").unwrap()), 1, v);
-        debug_print(format!("Path to words.csv: {}", matches.value_of("words").unwrap()), 1, v);
-        debug_print(format!("Path to lookups.csv: {}", matches.value_of("lookups").unwrap()), 1, v);
+        debug_print(format!("Path to vocab.db: {}", matches.value_of("vocabdb").unwrap()), 1, v);
         debug_print(format!("Verbosity: {}", v), 0, v);
 
-        // read the vocab.db database and do the magic
+        // read the vocab.db database
+        let vocabdb_path = matches.value_of("vocabdb").unwrap().to_string();
+        let timestamp = matches.value_of("timestamp").unwrap().parse::<u64>().unwrap();
+
+        wordlist = match get_lookups(vocabdb_path, timestamp, v) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Failed to get lookups from database: {}", e);
+                process::exit(1);
+            }
+        };
+
+        // add words and example sentences to Word struct
+        if let Err(e) = get_definition(&mut wordlist, v) {
+            eprintln!("Failed to get definition: {}", e);
+            process::exit(1);
+        }
+
+        // TODO: Write them to the final tsv
     }
+
+
 }
