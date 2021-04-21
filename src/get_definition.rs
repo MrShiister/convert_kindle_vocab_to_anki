@@ -37,38 +37,35 @@ pub fn get_definition(wordlist: &mut Vec<Word>, v: u8) -> Result<(), Box<dyn Err
     }
 
 
-    for (i, json) in jsonlist.iter().enumerate() {
-        wordlist[i].headword = json[0]["hwi"]["hw"].to_string();
-        wordlist[i].pronunciations = json[0]["hwi"]["prs"][0]["mw"].to_string();
-        wordlist[i].definition = json[0]["shortdef"].to_string();
-        
-        debug_print(format!("Received {} json: {}", i+1, wordlist[i].headword), 1, v);
-        debug_print(format!("{}", wordlist[i]), 2, v);
-        debug_print(format!("{}", json), 3, v);
-        
-        if wordlist[i].headword == "null" {
+    for (i, mut json) in jsonlist.iter().enumerate() {
+        let reslist;
+        if json[0]["hwi"]["hw"].is_null() {
+            // The definition of the word cannot be found. A list of close words is given in an array. Take the first word as the vocab.
             let vocab = &json[0];
-            debug_print(format!("{} is null. Trying {} instead.", wordlist[i].word, vocab), 0, v);
+            debug_print(format!("Definition for '{}' not found. Trying {} instead.", wordlist[i].word, vocab), 0, v);
             let uri = format!("https://dictionaryapi.com/api/v3/references/collegiate/json/{}?key=04a5d981-0869-42c8-a87c-c8cbfdcfcb56", vocab);
             let urilist = vec![uri];
-            let reslist = match block_on(get_json(urilist)) {
+            reslist = match block_on(get_json(urilist)) {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("{}", e);
                     return Err("Invalid response".into())
                 }
             };
-
-            for json in reslist {
-                wordlist[i].headword = json[0]["hwi"]["hw"].to_string();
-                wordlist[i].pronunciations = json[0]["hwi"]["prs"][0]["mw"].to_string();
-                wordlist[i].definition = json[0]["shortdef"].to_string();
-            
-                debug_print(format!("Received {} json: {}", i+1, wordlist[i].headword), 1, v);
-                debug_print(format!("{}", wordlist[i]), 2, v);
-                debug_print(format!("{}", json), 3, v);
-            }
+            json = &reslist[0];
         }
+
+        wordlist[i].headword = json[0]["hwi"]["hw"].to_string().replace("*", "").trim_matches('"').to_string();
+        wordlist[i].pronunciation = match json[0]["hwi"]["prs"][0]["mw"].is_null() {
+            true => "".to_string(),
+            false => json[0]["hwi"]["prs"][0]["mw"].to_string().trim_matches('"').to_string(),
+        };
+        wordlist[i].definition = json[0]["shortdef"].to_string().replace("\",\"", " ; ").trim_matches('[').trim_matches(']').trim_matches('"').to_string();
+        
+        debug_print(format!("Received {} json: {}", i+1, wordlist[i].headword), 1, v);
+        debug_print(format!("{}", wordlist[i]), 2, v);
+        debug_print(format!("{}", json), 3, v);
+        
     }
 
     Ok(())

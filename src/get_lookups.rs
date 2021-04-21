@@ -16,7 +16,7 @@ pub fn get_lookups(dbpath: String, timestamp: u64, v: u8) -> Result<Vec<Word>> {
             word_key: row.get(0)?,
                 word: row.get(1)?,
             headword: "".to_string(),
-      pronunciations: "".to_string(),
+       pronunciation: "".to_string(),
     example_sentence: row.get(2)?,
           definition: "".to_string(),
         })
@@ -24,7 +24,8 @@ pub fn get_lookups(dbpath: String, timestamp: u64, v: u8) -> Result<Vec<Word>> {
 
     let mut wordlist: Vec<Word> = Vec::new();
     for word in word_iter {
-        let word = word.unwrap();
+        let mut word = word.unwrap();
+        word.example_sentence = word.example_sentence.replace(&word.word, &format!("<b>{}</b>", &word.word).to_string());
         debug_print(format!("{}", word), 3, v);
         wordlist.push(word);
     }
@@ -32,6 +33,7 @@ pub fn get_lookups(dbpath: String, timestamp: u64, v: u8) -> Result<Vec<Word>> {
     Ok(wordlist)
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45,3 +47,4 @@ mod tests {
         assert_eq!(wordlist.len(), 7);
     }
 }
+*/
